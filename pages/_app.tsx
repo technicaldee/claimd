@@ -1,5 +1,6 @@
 import type { AppProps } from "next/app";
 import Head from "next/head";
+import Script from "next/script";
 import { Inter, Manrope } from "next/font/google";
 import { CountryProvider } from "@/components/country-provider";
 import { WalletProvider } from "@/components/wallet-provider";
@@ -18,6 +19,18 @@ const manrope = Manrope({
 export default function App({ Component, pageProps }: AppProps) {
   return (
     <>
+      <Script
+        src="https://www.googletagmanager.com/gtag/js?id=G-H2EQ6E8LXN"
+        strategy="afterInteractive"
+      />
+      <Script id="google-analytics" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-H2EQ6E8LXN');
+        `}
+      </Script>
       <Head>
         <title>Claimd</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
