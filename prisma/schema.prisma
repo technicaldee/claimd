@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String         @id @default(cuid())
+  walletAddress   String         @unique
+  displayName     String?
+  selectedCountry String         @default("Global")
+  createdAt       DateTime       @default(now())
+  claims          Claim[]
+  reactions       Reaction[]
+  comments        Comment[]
+  notifications   Notification[]
+  follows         UserFigureFollow[]
+}
+
+model Figure {
+  id              String        @id @default(cuid())
+  slug            String        @unique
+  name            String
+  role            String
+  country         String
+  category        String
+  imageUrl        String?
+  summary         String?
+  wikipediaTitle  String?
+  wikipediaPageId Int?          @unique
+  influenceScore  Int           @default(50)
+  searchBias      Int           @default(0)
+  engagementScore Float         @default(0)
+  createdAt       DateTime      @default(now())
+  claims          ClaimFigure[]
+  followers       UserFigureFollow[]
+}
+
+model Claim {
+  id                    String        @id @default(cuid())
+  body                  String
+  sourceUrl             String
+  sourceDomain          String
+  sourceTitle           String?
+  sourcePreviewImageUrl String?
+  status                String        @default("APPROVED")
+  country               String
+  category              String
+  postedByWallet        String
+  creatorShareBps       Int           @default(7000)
+  platformShareBps      Int           @default(3000)
+  totalReactions        Int           @default(0)
+  likesCount            Int           @default(0)
+  dislikesCount         Int           @default(0)
+  commentsCount         Int           @default(0)
+  earnedCusd            Float         @default(0)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  creatorId             String?
+  creator               User?         @relation(fields: [creatorId], references: [id])
+  figures               ClaimFigure[]
+  reactions             Reaction[]
+  comments              Comment[]
+}
+
+model ClaimFigure {
+  claimId       String
+  figureId      String
+  primaryFigure Boolean @default(false)
+  claim         Claim   @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  figure        Figure  @relation(fields: [figureId], references: [id], onDelete: Cascade)
+
+  @@id([claimId, figureId])
+}
+
+model Reaction {
+  id                String   @id @default(cuid())
+  type              String
+  amountCusd        Float
+  creatorShareCusd  Float
+  platformShareCusd Float
+  txHash            String?
+  createdAt         DateTime @default(now())
+  claimId           String
+  claim             Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  userId            String?
+  user              User?    @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  type      String
+  createdAt DateTime @default(now())
+  read      Boolean  @default(false)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Comment {
+  id               String   @id @default(cuid())
+  body             String
+  amountCusd       Float
+  creatorShareCusd Float
+  platformShareCusd Float
+  txHash           String?
+  createdAt        DateTime @default(now())
+  postedByWallet   String
+  claimId          String
+  claim            Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  userId           String?
+  user             User?    @relation(fields: [userId], references: [id])
+}
+
+model UserFigureFollow {
+  userId     String
+  figureId   String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  figure      Figure   @relation(fields: [figureId], references: [id], onDelete: Cascade)
+
+  @@id([userId, figureId])
+}
