@@ -35,6 +35,38 @@ function extractMetadata(html: string) {
   };
 }
 
+function decodeHtmlEntities(value: string) {
+  const entities: Record<string, string> = {
+    "&nbsp;": " ",
+    "&amp;": "&",
+    "&quot;": '"',
+    "&#39;": "'",
+    "&apos;": "'",
+    "&lt;": "<",
+    "&gt;": ">"
+  };
+
+  return value
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/&(nbsp|amp|quot|#39|apos|lt|gt);/g, (entity) => entities[entity] || entity);
+}
+
+function extractReadableText(html: string) {
+  return decodeHtmlEntities(
+    html
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+      .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, " ")
+      .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, " ")
+      .replace(/<!--[\s\S]*?-->/g, " ")
+      .replace(/<\/(p|div|section|article|li|tr|td|th|h1|h2|h3|h4|h5|h6|br)>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function validateClaimSource(input: {
   claimText: string;
   sourceUrl: string;
@@ -60,7 +92,8 @@ export async function validateClaimSource(input: {
 
   const html = await response.text();
   const metadata = extractMetadata(html);
-  const score = keywordScore(input.claimText, input.figureNames, `${metadata.title || ""} ${html.slice(0, 4000)}`);
+  const readableText = extractReadableText(html);
+  const score = keywordScore(input.claimText, input.figureNames, `${metadata.title || ""} ${readableText.slice(0, 50000)}`);
 
   if (score < 0.18) {
     return {
