@@ -85,6 +85,16 @@ export default function ProfilePage() {
                     ? `MiniPay withdrawal address auto-detected: ${walletAddress || data.withdrawalAddress}`
                     : `Withdrawal address: ${walletAddress || data.withdrawalAddress}`}
                 </p>
+                {isMiniPay ? (
+                  <a
+                    href="https://minipay.opera.com/add_cash"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex text-sm font-semibold text-white underline underline-offset-4"
+                  >
+                    Add cash in MiniPay
+                  </a>
+                ) : null}
               </div>
               <button
                 type="button"

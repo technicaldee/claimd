@@ -17,6 +17,7 @@ body {
   background: #f7f9fb;
   color: #191c1e;
   font-family: var(--font-inter), sans-serif;
+  overscroll-behavior-y: none;
 }
 
 a {

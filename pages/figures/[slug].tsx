@@ -56,13 +56,13 @@ export default function FigureWallPage({ figure, trendingClaim, claims, timeline
           {trendingClaim ? (
             <div className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8">
               <div className="mb-6 flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-primary">Trending Now</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-primary">Hot market</span>
               </div>
               <h2 className="font-headline text-3xl font-bold leading-tight">{trendingClaim.body}</h2>
               <div className="mt-6 rounded-lg bg-surface-container-low p-6">
                 <div className="mb-3 flex items-center gap-4">
                   <MaterialIcon name="description" className="text-primary" />
-                  <span className="text-sm font-bold">Supporting Evidence</span>
+                  <span className="text-sm font-bold">Why people are backing this take</span>
                 </div>
                 <p className="text-sm leading-relaxed text-on-surface-variant">{trendingClaim.sourceTitle || trendingClaim.sourceDomain}</p>
               </div>

@@ -1,5 +1,7 @@
 import clsx, { type ClassValue } from "clsx";
 
+const CLAIM_WINDOW_HOURS = 24;
+
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
 }
@@ -51,6 +53,75 @@ export function formatRelativeTime(isoDate: string) {
 
   const diffDays = Math.round(diffHours / 24);
   return rtf.format(diffDays, "day");
+}
+
+export function getClaimPoolAmount(totalReactions: number, unitStake: number) {
+  return Number((totalReactions * unitStake).toFixed(2));
+}
+
+export function getClaimVoteSplit(likesCount: number, dislikesCount: number) {
+  const totalVotes = likesCount + dislikesCount;
+  if (totalVotes === 0) {
+    return {
+      agree: 50,
+      disagree: 50
+    };
+  }
+
+  const agree = Math.round((likesCount / totalVotes) * 100);
+  return {
+    agree,
+    disagree: 100 - agree
+  };
+}
+
+export function getClaimCountdown(isoDate: string) {
+  const endAt = new Date(isoDate).getTime() + CLAIM_WINDOW_HOURS * 60 * 60 * 1000;
+  const remainingMs = endAt - Date.now();
+
+  if (remainingMs <= 0) {
+    return {
+      ended: true,
+      label: "Closing now"
+    };
+  }
+
+  const totalMinutes = Math.floor(remainingMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    return {
+      ended: false,
+      label: `${days}d ${hours % 24}h left`
+    };
+  }
+
+  return {
+    ended: false,
+    label: `${hours}h ${minutes}m left`
+  };
+}
+
+export function getClaimHeatLabel(isoDate: string) {
+  const ageMs = Date.now() - new Date(isoDate).getTime();
+  const ageHours = ageMs / (60 * 60 * 1000);
+
+  if (ageHours <= 2) {
+    return "Just started";
+  }
+
+  const countdown = getClaimCountdown(isoDate);
+  if (!countdown.ended) {
+    const endAt = new Date(isoDate).getTime() + CLAIM_WINDOW_HOURS * 60 * 60 * 1000;
+    const hoursRemaining = (endAt - Date.now()) / (60 * 60 * 1000);
+    if (hoursRemaining <= 3) {
+      return "Ending soon";
+    }
+  }
+
+  return "Trending";
 }
 
 export function safeJsonParse<T>(value: string | null, fallback: T): T {

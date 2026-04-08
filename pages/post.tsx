@@ -94,11 +94,11 @@ export default function PostPage() {
     <AppShell active="post">
       <div className="mx-auto max-w-4xl">
         <header className="mb-10">
-          <h1 className="font-headline text-5xl font-extrabold tracking-tight text-primary">Post a Claim</h1>
+          <h1 className="font-headline text-5xl font-extrabold tracking-tight text-primary">Start a Bet</h1>
           <div className="mt-5 flex items-start gap-3 rounded-xl border-l-4 border-primary bg-secondary-container p-4">
             <MaterialIcon name="info" className="mt-0.5 text-primary" />
             <p className="text-sm leading-relaxed text-on-secondary-container">
-              Every post must be about at least one known public figure and include a source link. You can tag multiple personalities in one claim.
+              Start a debate people can instantly back with money. Keep it sharp, tag at least one public figure, and attach a source link if you have one.
             </p>
           </div>
         </header>
@@ -106,11 +106,11 @@ export default function PostPage() {
         <div className="rounded-[28px] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:p-10">
           <div className="space-y-8">
             <div className="space-y-3">
-              <label className="font-headline text-lg font-bold text-primary">Public Figures</label>
+              <label className="font-headline text-lg font-bold text-primary">Who is this about?</label>
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search Wikipedia for a name (e.g. Satya Nadella)"
+                placeholder="Search a public figure (e.g. Burna Boy)"
                 className="w-full rounded-xl border-0 bg-surface-container-highest px-4 py-4 outline-none ring-0"
               />
               {selectedFigures.length > 0 ? (
@@ -178,19 +178,19 @@ export default function PostPage() {
             </div>
 
             <div className="space-y-3">
-              <label className="font-headline text-lg font-bold text-primary">The Claim</label>
+              <label className="font-headline text-lg font-bold text-primary">What are people betting on?</label>
               <textarea
                 rows={4}
                 value={claimText}
                 onChange={(event) => setClaimText(event.target.value)}
-                placeholder="What is being claimed? Be specific and objective."
+                placeholder="Write the take people will argue over."
                 className="w-full rounded-xl border-0 bg-surface-container-highest p-4 outline-none"
               />
               <div className="text-right text-[10px] font-bold uppercase tracking-[0.2em] text-outline">{claimText.length} / 280</div>
             </div>
 
             <div className="space-y-3">
-              <label className="font-headline text-lg font-bold text-primary">Evidence Source</label>
+              <label className="font-headline text-lg font-bold text-primary">Source link</label>
               <div className="flex flex-col gap-4 md:flex-row">
                 <input
                   value={sourceUrl}
@@ -203,7 +203,7 @@ export default function PostPage() {
                   onClick={() => void validateSource()}
                   className="rounded-xl bg-editorial-gradient px-8 py-4 font-semibold text-white transition hover:opacity-90"
                 >
-                  Validate Source
+                  Check source
                 </button>
               </div>
             </div>
@@ -213,12 +213,12 @@ export default function PostPage() {
               <span className="text-sm text-on-surface-variant">
                 {validation?.ok
                   ? `Validation passed${validation.title ? `: ${validation.title}` : ""}`
-                  : validation?.reason || "Validation pending. Add a URL and verify it before posting."}
+                  : validation?.reason || "Validation pending. Add a URL and verify it before starting this bet."}
               </span>
             </div>
 
             <div className="border-t border-outline-variant/10 pt-8">
-              <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-outline">Preview Card Appearance</p>
+              <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-outline">Live card preview</p>
               <div className="rounded-xl bg-surface-container p-6">
                 <div className="mb-4 flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-highest font-headline font-bold text-primary">
@@ -230,6 +230,11 @@ export default function PostPage() {
                   </div>
                 </div>
                 <p className="font-headline text-xl font-bold text-on-surface">{previewTitle}</p>
+                <div className="mt-4 flex flex-wrap gap-3 text-xs font-semibold text-on-secondary-container">
+                  <span>Pool starts at 0.00 cUSD</span>
+                  <span>24h countdown</span>
+                  <span>Agree vs disagree</span>
+                </div>
               </div>
             </div>
 
@@ -240,7 +245,7 @@ export default function PostPage() {
                 onClick={() => void publishClaim()}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-5 font-headline text-lg font-extrabold text-white disabled:cursor-not-allowed disabled:bg-surface-container-highest disabled:text-outline"
               >
-                {saving ? "Publishing..." : "Post Claim"}
+                {saving ? "Starting..." : "Start this bet"}
                 <MaterialIcon name={canPost ? "send" : "lock"} />
               </button>
             </div>

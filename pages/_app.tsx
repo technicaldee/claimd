@@ -33,7 +33,9 @@ export default function App({ Component, pageProps }: AppProps) {
       </Script>
       <Head>
         <title>Claimd</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta name="theme-color" content="#000b60" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta
           name="description"
           content="Claimd is a MiniPay-native public figure feed where people post sourced claims and earn when others pay to like or dislike them."
