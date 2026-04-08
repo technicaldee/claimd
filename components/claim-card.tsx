@@ -86,50 +86,40 @@ export function ClaimCard({ claim, detail = false }: { claim: ClaimCardData; det
   return (
     <>
       <article className="overflow-hidden rounded-[28px] border border-outline-variant/10 bg-surface-container-lowest shadow-sm">
-        <div className="space-y-6 p-6 md:p-7">
+        <div className="space-y-4 p-5 md:p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary">Live now</p>
+              <div className="flex items-center gap-2">
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary">Live now</p>
+                <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white">
+                  {countdown.label}
+                </span>
+              </div>
               <Link href={`/claims/${state.id}`} className="mt-3 block">
-                <h2 className="font-headline text-3xl font-black leading-tight tracking-tight text-on-surface md:text-4xl">
+                <h2 className="font-headline text-2xl font-bold leading-tight tracking-tight text-on-surface md:text-3xl">
                   {state.body}
                 </h2>
               </Link>
             </div>
-            <div className="rounded-full bg-primary px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-white">
-              {countdown.label}
-            </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-3xl bg-editorial-gradient p-5 text-white">
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/70">Pool</p>
-              <p className="mt-3 font-headline text-4xl font-black">{toCurrency(pools.totalPool)}</p>
+          <div className="rounded-3xl bg-surface-container p-4">
+            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] text-on-secondary-container">
+              <span>Yes</span>
+              <span>No</span>
             </div>
-
-            <div className="rounded-3xl bg-surface-container p-5">
-              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] text-on-secondary-container">
-                <span>Yes</span>
-                <span>No</span>
+            <div className="mt-2 flex items-end justify-between gap-4">
+              <div>
+                <div className="font-headline text-2xl font-black text-primary">{split.agree}%</div>
+                <div className="text-[11px] font-semibold text-on-secondary-container">{toCurrency(pools.yesPool)}</div>
               </div>
-              <div className="mt-3 flex items-end justify-between gap-4">
-                <div>
-                  <div className="font-headline text-3xl font-black text-primary">{split.agree}%</div>
-                  <div className="text-xs font-semibold text-on-secondary-container">{toCurrency(pools.yesPool)}</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-headline text-3xl font-black text-on-surface">{split.disagree}%</div>
-                  <div className="text-xs font-semibold text-on-secondary-container">{toCurrency(pools.noPool)}</div>
-                </div>
-              </div>
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-container-highest">
-                <div className="h-full bg-primary" style={{ width: `${split.agree}%` }} />
+              <div className="text-right">
+                <div className="font-headline text-2xl font-black text-on-surface">{split.disagree}%</div>
+                <div className="text-[11px] font-semibold text-on-secondary-container">{toCurrency(pools.noPool)}</div>
               </div>
             </div>
-
-            <div className="rounded-3xl bg-[#09103f] p-5 text-white">
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/65">Time left</p>
-              <p className="mt-3 font-headline text-4xl font-black">{countdown.label}</p>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-container-highest">
+              <div className="h-full bg-primary" style={{ width: `${split.agree}%` }} />
             </div>
           </div>
 
@@ -142,7 +132,7 @@ export function ClaimCard({ claim, detail = false }: { claim: ClaimCardData; det
             </div>
           ) : null}
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               disabled={countdown.ended || pending}
@@ -153,8 +143,8 @@ export function ClaimCard({ claim, detail = false }: { claim: ClaimCardData; det
               className="rounded-3xl bg-primary px-5 py-5 text-left text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <div className="text-[11px] font-black uppercase tracking-[0.2em] text-white/70">Back yes</div>
-              <div className="mt-2 font-headline text-3xl font-black">YES</div>
-              <div className="mt-1 text-sm font-semibold">possible {formatReturnMultiplier(yesReturn)}</div>
+              <div className="mt-1 font-headline text-2xl font-black">YES</div>
+              <div className="mt-1 text-xs font-semibold">possible {formatReturnMultiplier(yesReturn)}</div>
             </button>
             <button
               type="button"
@@ -166,8 +156,8 @@ export function ClaimCard({ claim, detail = false }: { claim: ClaimCardData; det
               className="rounded-3xl bg-surface-container-high px-5 py-5 text-left text-on-surface transition hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-50"
             >
               <div className="text-[11px] font-black uppercase tracking-[0.2em] text-on-secondary-container">Back no</div>
-              <div className="mt-2 font-headline text-3xl font-black">NO</div>
-              <div className="mt-1 text-sm font-semibold">possible {formatReturnMultiplier(noReturn)}</div>
+              <div className="mt-1 font-headline text-2xl font-black">NO</div>
+              <div className="mt-1 text-xs font-semibold">possible {formatReturnMultiplier(noReturn)}</div>
             </button>
           </div>
 
@@ -210,10 +200,6 @@ export function ClaimCard({ claim, detail = false }: { claim: ClaimCardData; det
             </div>
 
             <div className="mt-6 space-y-4 rounded-3xl bg-surface-container-low p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-on-secondary-container">Pool</span>
-                <span className="font-headline text-2xl font-black text-primary">{toCurrency(pools.totalPool)}</span>
-              </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-on-secondary-container">Your return if {selectedLabel} wins</span>
                 <span className="font-headline text-2xl font-black text-on-surface">

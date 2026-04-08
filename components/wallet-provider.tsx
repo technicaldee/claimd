@@ -26,7 +26,13 @@ import {
 import { reactionsTreasuryAbi } from "@/lib/contracts/reactionsTreasuryAbi";
 import { toClaimKey } from "@/lib/contracts/claimKey";
 
-type ConnectionType = "minipay" | "walletconnect" | "disconnected";
+type ConnectionType = "minipay" | "injected" | "walletconnect" | "disconnected";
+
+type InjectedProvider = NonNullable<Window["ethereum"]>;
+
+function isInjectedMiniPayProvider(provider: unknown): provider is InjectedProvider {
+  return Boolean(provider && typeof provider === "object" && "isMiniPay" in provider && (provider as { isMiniPay?: boolean }).isMiniPay);
+}
 
 interface WalletContextValue {
   walletAddress?: string;
@@ -44,6 +50,12 @@ declare global {
   interface Window {
     ethereum?: {
       isMiniPay?: boolean;
+      providers?: Array<{
+        isMiniPay?: boolean;
+        request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>;
+        on?: (event: string, callback: (...args: unknown[]) => void) => void;
+        removeListener?: (event: string, callback: (...args: unknown[]) => void) => void;
+      }>;
       request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>;
       on?: (event: string, callback: (...args: unknown[]) => void) => void;
       removeListener?: (event: string, callback: (...args: unknown[]) => void) => void;
@@ -64,14 +76,33 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
     (typeof window !== "undefined" ? window.location.origin : "https://claimd.app");
+  const getInjectedProvider = useCallback((): InjectedProvider | undefined => {
+    if (!window.ethereum) {
+      return undefined;
+    }
+
+    const availableProviders = window.ethereum.providers;
+    if (!availableProviders || availableProviders.length === 0) {
+      return window.ethereum;
+    }
+
+    if (isMiniPay) {
+      return (availableProviders.find((provider) => isMiniPayProvider(provider)) as InjectedProvider | undefined) || availableProviders[0];
+    }
+
+    return (
+      (availableProviders.find((provider) => !isMiniPayProvider(provider)) as InjectedProvider | undefined) ||
+      availableProviders[0]
+    );
+  }, [isMiniPay]);
 
   const syncInjectedAccount = useCallback(
     async (requestAccounts: boolean) => {
-      if (!window.ethereum) {
+      const provider = getInjectedProvider();
+      if (!provider) {
         return undefined;
       }
 
-      const provider = window.ethereum;
       const shouldUseMiniPayRequest = requestAccounts && isMiniPayProvider(provider);
       const accounts = shouldUseMiniPayRequest
         ? [await requestMiniPayAccount(provider)].filter(Boolean)
@@ -80,7 +111,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const account = accounts[0];
       if (account) {
         setWalletAddress(account);
-        setConnectionType(isMiniPayProvider(provider) ? "minipay" : "walletconnect");
+        setConnectionType(isMiniPayProvider(provider) ? "minipay" : "injected");
         return account;
       }
 
@@ -88,7 +119,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       setConnectionType("disconnected");
       return undefined;
     },
-    []
+    [getInjectedProvider]
   );
 
   useEffect(() => {
@@ -96,48 +127,49 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [isMiniPay, syncInjectedAccount]);
 
   useEffect(() => {
-    if (!window.ethereum?.on) {
+    const provider = getInjectedProvider();
+    if (!provider?.on) {
       return;
     }
 
     const handleAccountsChanged = (accounts: unknown) => {
       const nextAccount = Array.isArray(accounts) && typeof accounts[0] === "string" ? accounts[0] : undefined;
       setWalletAddress(nextAccount);
-      setConnectionType(nextAccount ? (isMiniPayProvider(window.ethereum) ? "minipay" : "walletconnect") : "disconnected");
+      setConnectionType(nextAccount ? (isMiniPayProvider(provider) ? "minipay" : "injected") : "disconnected");
     };
     const handleChainChanged = () => {
       void syncInjectedAccount(false);
     };
 
-    window.ethereum.on("accountsChanged", handleAccountsChanged);
-    window.ethereum.on("chainChanged", handleChainChanged);
+    provider.on("accountsChanged", handleAccountsChanged);
+    provider.on("chainChanged", handleChainChanged);
 
     return () => {
-      window.ethereum?.removeListener?.("accountsChanged", handleAccountsChanged);
-      window.ethereum?.removeListener?.("chainChanged", handleChainChanged);
+      provider.removeListener?.("accountsChanged", handleAccountsChanged);
+      provider.removeListener?.("chainChanged", handleChainChanged);
     };
-  }, [syncInjectedAccount]);
+  }, [getInjectedProvider, syncInjectedAccount]);
 
   const connectInjected = useCallback(async () => {
-    if (!window.ethereum) {
+    const provider = getInjectedProvider();
+    if (!provider) {
       return false;
     }
 
-    if (isMiniPayProvider(window.ethereum)) {
-      await ensureMiniPayChain(window.ethereum).catch(() => undefined);
-    } else {
-      await ensureCeloChain(window.ethereum).catch(() => undefined);
-    }
-
-    const accounts = (await window.ethereum.request({ method: "eth_requestAccounts" })) as string[];
+    const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
     if (accounts[0]) {
       setWalletAddress(accounts[0]);
-      setConnectionType(isMiniPayProvider(window.ethereum) ? "minipay" : "walletconnect");
+      setConnectionType(isMiniPayProvider(provider) ? "minipay" : "injected");
+      if (isMiniPayProvider(provider)) {
+        await ensureMiniPayChain(provider).catch(() => undefined);
+      } else {
+        await ensureCeloChain(provider).catch(() => undefined);
+      }
       return true;
     }
 
     return false;
-  }, []);
+  }, [getInjectedProvider]);
 
   const connectWalletConnect = useCallback(async () => {
     if (!process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID) {
@@ -172,7 +204,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setConnecting(true);
 
     try {
-      const injectedConnected = await connectInjected();
+      const injectedConnected = await connectInjected().catch(() => false);
       if (!injectedConnected) {
         await connectWalletConnect();
       }
@@ -206,28 +238,28 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Connect a wallet to continue");
     }
 
-    const providerSource = walletConnectRef.current ?? window.ethereum;
+    const providerSource = walletConnectRef.current ?? getInjectedProvider();
     if (!providerSource) {
       throw new Error("No wallet provider available");
     }
 
-    await ensureCeloChain(providerSource).catch(() => undefined);
-    const usingMiniPay = providerSource === window.ethereum && isMiniPayProvider(window.ethereum);
+    await ensureCeloChain(providerSource);
+    const usingMiniPay = isInjectedMiniPayProvider(providerSource);
 
-    if (usingMiniPay && window.ethereum) {
+    if (usingMiniPay) {
       const amount = parseUnits(String(REACTION_PRICE_CUSD), 18);
       if (claimId) {
-        const readProvider = new BrowserProvider(window.ethereum);
+        const readProvider = new BrowserProvider(providerSource);
         const readOnlyToken = new Contract(CUSD_TOKEN_ADDRESS, CUSD_ABI, readProvider);
         const allowance = await readOnlyToken.allowance(activeWallet, REACTIONS_TREASURY_ADDRESS);
         if (allowance < amount) {
-          await miniPayApproveStableToken(window.ethereum, activeWallet, REACTIONS_TREASURY_ADDRESS, amount);
+          await miniPayApproveStableToken(providerSource, activeWallet, REACTIONS_TREASURY_ADDRESS, amount);
         }
 
-        return miniPayReact(window.ethereum, activeWallet, claimId, Boolean(isLike));
+        return miniPayReact(providerSource, activeWallet, claimId, Boolean(isLike));
       }
 
-      return miniPayTransferStableToken(window.ethereum, activeWallet, REACTIONS_TREASURY_ADDRESS, amount);
+      return miniPayTransferStableToken(providerSource, activeWallet, REACTIONS_TREASURY_ADDRESS, amount);
     }
 
     const provider = new BrowserProvider(providerSource);
@@ -251,7 +283,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     const tx = await cusd.transfer(REACTIONS_TREASURY_ADDRESS, amount);
     await tx.wait();
     return tx.hash as string;
-  }, [ensureWalletAddress]);
+  }, [ensureWalletAddress, getInjectedProvider]);
 
   const sendClaimPayment = useCallback(async () => {
     const activeWallet = await ensureWalletAddress();
@@ -264,17 +296,17 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Missing platform wallet address");
     }
 
-    const providerSource = walletConnectRef.current ?? window.ethereum;
+    const providerSource = walletConnectRef.current ?? getInjectedProvider();
     if (!providerSource) {
       throw new Error("No wallet provider available");
     }
 
-    await ensureCeloChain(providerSource).catch(() => undefined);
-    const usingMiniPay = providerSource === window.ethereum && isMiniPayProvider(window.ethereum);
+    await ensureCeloChain(providerSource);
+    const usingMiniPay = isInjectedMiniPayProvider(providerSource);
     const amount = parseUnits(String(CLAIM_PRICE_CUSD), 18);
 
-    if (usingMiniPay && window.ethereum) {
-      return miniPayTransferStableToken(window.ethereum, activeWallet, PLATFORM_WALLET_ADDRESS, amount);
+    if (usingMiniPay) {
+      return miniPayTransferStableToken(providerSource, activeWallet, PLATFORM_WALLET_ADDRESS, amount);
     }
 
     const provider = new BrowserProvider(providerSource);
@@ -283,7 +315,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     const tx = await cusd.transfer(PLATFORM_WALLET_ADDRESS, amount);
     await tx.wait();
     return tx.hash as string;
-  }, [ensureWalletAddress]);
+  }, [ensureWalletAddress, getInjectedProvider]);
 
   const sendCommentPayment = useCallback(async (creatorWallet: string) => {
     const activeWallet = await ensureWalletAddress();
@@ -292,21 +324,21 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Connect a wallet to continue");
     }
 
-    const providerSource = walletConnectRef.current ?? window.ethereum;
+    const providerSource = walletConnectRef.current ?? getInjectedProvider();
     if (!providerSource) {
       throw new Error("No wallet provider available");
     }
 
-    await ensureCeloChain(providerSource).catch(() => undefined);
-    const usingMiniPay = providerSource === window.ethereum && isMiniPayProvider(window.ethereum);
+    await ensureCeloChain(providerSource);
+    const usingMiniPay = isInjectedMiniPayProvider(providerSource);
 
-    if (usingMiniPay && window.ethereum) {
+    if (usingMiniPay) {
       const creatorAmount = parseUnits(String((COMMENT_PRICE_CUSD * 0.7).toFixed(4)), 18);
       const platformAmount = parseUnits(String((COMMENT_PRICE_CUSD * 0.3).toFixed(4)), 18);
 
-      const creatorTxHash = await miniPayTransferStableToken(window.ethereum, activeWallet, creatorWallet, creatorAmount);
+      const creatorTxHash = await miniPayTransferStableToken(providerSource, activeWallet, creatorWallet, creatorAmount);
       if (PLATFORM_WALLET_ADDRESS) {
-        await miniPayTransferStableToken(window.ethereum, activeWallet, PLATFORM_WALLET_ADDRESS, platformAmount);
+        await miniPayTransferStableToken(providerSource, activeWallet, PLATFORM_WALLET_ADDRESS, platformAmount);
       }
 
       return creatorTxHash;
@@ -327,7 +359,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
 
     return creatorTx.hash as string;
-  }, [ensureWalletAddress]);
+  }, [ensureWalletAddress, getInjectedProvider]);
 
   const withdrawCreatorRewards = useCallback(async () => {
     const activeWallet = await ensureWalletAddress();
@@ -340,13 +372,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Missing treasury contract address");
     }
 
-    const providerSource = walletConnectRef.current ?? window.ethereum;
+    const providerSource = walletConnectRef.current ?? getInjectedProvider();
     if (!providerSource) {
       throw new Error("No wallet provider available");
     }
 
-    if (isMiniPayProvider(window.ethereum) && window.ethereum) {
-      return miniPayWithdrawCreatorRewards(window.ethereum, activeWallet);
+    await ensureCeloChain(providerSource);
+
+    if (isInjectedMiniPayProvider(providerSource)) {
+      return miniPayWithdrawCreatorRewards(providerSource, activeWallet);
     }
 
     const provider = new BrowserProvider(providerSource);
@@ -355,7 +389,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     const tx = await treasury.withdrawCreatorRewards();
     await tx.wait();
     return tx.hash as string;
-  }, [ensureWalletAddress]);
+  }, [ensureWalletAddress, getInjectedProvider]);
 
   const value = useMemo(
     () => ({

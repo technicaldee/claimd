@@ -16,7 +16,7 @@ body {
   margin: 0;
   background: #f7f9fb;
   color: #191c1e;
-  font-family: Inter, "Avenir Next", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-averta), ui-sans-serif, system-ui, sans-serif;
   overscroll-behavior-y: none;
 }
 

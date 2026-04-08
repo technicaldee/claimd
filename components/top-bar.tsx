@@ -7,7 +7,7 @@ import { useWallet } from "@/components/wallet-provider";
 export function TopBar({ active }: { active: "home" | "explore" | "post" | "notifications" | "profile" | "onboarding" | "figure" }) {
   const { walletAddress, connect, connecting, connectionType, isMiniPay } = useWallet();
   const walletLabel = walletAddress
-    ? `${compactWallet(walletAddress)} · ${connectionType === "minipay" ? "MiniPay" : "WalletConnect"}`
+    ? `${compactWallet(walletAddress)} · ${connectionType === "minipay" ? "MiniPay" : connectionType === "injected" ? "Browser wallet" : "WalletConnect"}`
     : connecting
       ? "Connecting..."
       : isMiniPay

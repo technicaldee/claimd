@@ -1,9 +1,26 @@
 import type { AppProps } from "next/app";
 import Head from "next/head";
 import Script from "next/script";
+import localFont from "next/font/local";
 import { CountryProvider } from "@/components/country-provider";
 import { WalletProvider } from "@/components/wallet-provider";
 import "@/styles/globals.css";
+
+const averta = localFont({
+  src: [
+    {
+      path: "../public/fonts/averta/Averta-Regular.woff2",
+      weight: "400",
+      style: "normal"
+    },
+    {
+      path: "../public/fonts/averta/Averta-Bold.woff2",
+      weight: "700",
+      style: "normal"
+    }
+  ],
+  variable: "--font-averta"
+});
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
@@ -35,7 +52,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:image" content="/logo.png" />
       </Head>
-      <div>
+      <div className={averta.variable}>
         <CountryProvider>
           <WalletProvider>
             <Component {...pageProps} />
