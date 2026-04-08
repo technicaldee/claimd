@@ -59,6 +59,18 @@ export function getClaimPoolAmount(totalReactions: number, unitStake: number) {
   return Number((totalReactions * unitStake).toFixed(2));
 }
 
+export function getClaimPools(likesCount: number, dislikesCount: number, unitStake: number) {
+  const yesPool = likesCount * unitStake;
+  const noPool = dislikesCount * unitStake;
+  const totalPool = yesPool + noPool;
+
+  return {
+    yesPool: Number(yesPool.toFixed(2)),
+    noPool: Number(noPool.toFixed(2)),
+    totalPool: Number(totalPool.toFixed(2))
+  };
+}
+
 export function getClaimVoteSplit(likesCount: number, dislikesCount: number) {
   const totalVotes = likesCount + dislikesCount;
   if (totalVotes === 0) {
@@ -73,6 +85,21 @@ export function getClaimVoteSplit(likesCount: number, dislikesCount: number) {
     agree,
     disagree: 100 - agree
   };
+}
+
+export function getPotentialReturnMultiplier(totalPool: number, sidePool: number, stakeAmount: number) {
+  const payoutPool = totalPool + stakeAmount;
+  const backedSidePool = sidePool + stakeAmount;
+
+  if (backedSidePool <= 0) {
+    return 1;
+  }
+
+  return Math.max(1, Number((payoutPool / backedSidePool).toFixed(1)));
+}
+
+export function formatReturnMultiplier(multiplier: number) {
+  return `${multiplier.toFixed(1)}x`;
 }
 
 export function getClaimCountdown(isoDate: string) {

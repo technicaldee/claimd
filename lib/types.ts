@@ -86,6 +86,9 @@ export interface ProfileSnapshot {
   displayName: string;
   selectedCountry: string;
   totalPosts: number;
+  totalStaked: number;
+  winsCount: number;
+  lossesCount: number;
   totalReactionsReceived: number;
   totalEarned: number;
   availableOnchainRewards: number;

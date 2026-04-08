@@ -1,42 +1,48 @@
 "use client";
 
 import { useState } from "react";
-import useSWR from "swr";
 import Link from "next/link";
 import { MaterialIcon } from "@/components/material-icon";
 import { useWallet } from "@/components/wallet-provider";
-import { FigureAvatar } from "@/components/figure-avatar";
-import { COMMENT_PRICE_CUSD, REACTION_PRICE_CUSD } from "@/lib/payments/celo";
-import { fetcher } from "@/lib/fetcher";
-import type { ClaimCardData, CommentItem } from "@/lib/types";
-import { formatRelativeTime, getClaimCountdown, getClaimHeatLabel, getClaimPoolAmount, getClaimVoteSplit, toCurrency } from "@/lib/utils";
+import { REACTION_PRICE_CUSD } from "@/lib/payments/celo";
+import type { ClaimCardData } from "@/lib/types";
+import {
+  formatReturnMultiplier,
+  getClaimCountdown,
+  getClaimPools,
+  getClaimVoteSplit,
+  getPotentialReturnMultiplier,
+  toCurrency
+} from "@/lib/utils";
 
-export function ClaimCard({ claim }: { claim: ClaimCardData }) {
+type StakeSide = "LIKE" | "DISLIKE";
+
+export function ClaimCard({ claim, detail = false }: { claim: ClaimCardData; detail?: boolean }) {
   const [state, setState] = useState(claim);
-  const [pending, setPending] = useState<"LIKE" | "DISLIKE" | null>(null);
-  const [commentOpen, setCommentOpen] = useState(false);
-  const [commentBody, setCommentBody] = useState("");
-  const [commentPending, setCommentPending] = useState(false);
-  const { walletAddress, connect, sendReactionPayment, sendCommentPayment } = useWallet();
+  const [selectedSide, setSelectedSide] = useState<StakeSide | null>(null);
+  const [pending, setPending] = useState(false);
+  const [successState, setSuccessState] = useState<{ side: StakeSide; oppositePercent: number } | null>(null);
+  const { walletAddress, connect, sendReactionPayment } = useWallet();
   const primaryFigure = state.figures.find((figure) => figure.primary) ?? state.figures[0];
-  const poolAmount = getClaimPoolAmount(state.totalReactions, REACTION_PRICE_CUSD);
-  const voteSplit = getClaimVoteSplit(state.likesCount, state.dislikesCount);
   const countdown = getClaimCountdown(state.createdAt);
-  const heatLabel = getClaimHeatLabel(state.createdAt);
-  const { data: comments = [], mutate: mutateComments } = useSWR<CommentItem[]>(
-    commentOpen ? `/api/comments?claimId=${encodeURIComponent(state.id)}` : null,
-    fetcher
-  );
+  const split = getClaimVoteSplit(state.likesCount, state.dislikesCount);
+  const pools = getClaimPools(state.likesCount, state.dislikesCount, REACTION_PRICE_CUSD);
+  const yesReturn = getPotentialReturnMultiplier(pools.totalPool, pools.yesPool, REACTION_PRICE_CUSD);
+  const noReturn = getPotentialReturnMultiplier(pools.totalPool, pools.noPool, REACTION_PRICE_CUSD);
 
-  async function react(type: "LIKE" | "DISLIKE") {
-    setPending(type);
+  async function confirmStake() {
+    if (!selectedSide || countdown.ended) {
+      return;
+    }
+
+    setPending(true);
 
     try {
       if (!walletAddress) {
         await connect();
       }
 
-      const txHash = await sendReactionPayment(state.id, type === "LIKE").catch(() => undefined);
+      const txHash = await sendReactionPayment(state.id, selectedSide === "LIKE");
       const response = await fetch("/api/reactions", {
         method: "POST",
         headers: {
@@ -45,7 +51,7 @@ export function ClaimCard({ claim }: { claim: ClaimCardData }) {
         body: JSON.stringify({
           claimId: state.id,
           walletAddress: walletAddress || "0xLocalPreview00000000000000000000000000000001",
-          type,
+          type: selectedSide,
           txHash
         })
       });
@@ -56,253 +62,186 @@ export function ClaimCard({ claim }: { claim: ClaimCardData }) {
 
       setState((current) => ({
         ...current,
-        likesCount: type === "LIKE" ? current.likesCount + 1 : current.likesCount,
-        dislikesCount: type === "DISLIKE" ? current.dislikesCount + 1 : current.dislikesCount,
+        likesCount: selectedSide === "LIKE" ? current.likesCount + 1 : current.likesCount,
+        dislikesCount: selectedSide === "DISLIKE" ? current.dislikesCount + 1 : current.dislikesCount,
         totalReactions: current.totalReactions + 1,
         earnedCusd: Number((current.earnedCusd + REACTION_PRICE_CUSD * 0.7).toFixed(2))
       }));
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Unable to react right now");
-    } finally {
-      setPending(null);
-    }
-  }
-
-  async function postComment() {
-    if (!commentBody.trim()) {
-      return;
-    }
-
-    setCommentPending(true);
-
-    try {
-      if (!walletAddress) {
-        await connect();
-      }
-
-      const txHash = await sendCommentPayment(state.creatorWallet).catch(() => undefined);
-      const response = await fetch("/api/comments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          claimId: state.id,
-          walletAddress: walletAddress || "0xLocalPreview00000000000000000000000000000001",
-          body: commentBody.trim(),
-          txHash
-        })
+      setSuccessState({
+        side: selectedSide,
+        oppositePercent: selectedSide === "LIKE" ? split.disagree : split.agree
       });
-
-      if (!response.ok) {
-        throw new Error("Unable to post comment");
-      }
-
-      setState((current) => ({
-        ...current,
-        commentsCount: current.commentsCount + 1,
-        earnedCusd: Number((current.earnedCusd + COMMENT_PRICE_CUSD * 0.7).toFixed(2))
-      }));
-      setCommentBody("");
-      await mutateComments();
+      setSelectedSide(null);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Unable to comment right now");
+      window.alert(error instanceof Error ? error.message : "Unable to back this side right now");
     } finally {
-      setCommentPending(false);
+      setPending(false);
     }
   }
 
-  async function shareClaim() {
-    const shareUrl = `${window.location.origin}/figures/${primaryFigure.slug}#claim-${state.id}`;
-    const text = `"${state.body}"\n\n${toCurrency(poolAmount)} on the line.\nPick your side: ${shareUrl}`;
-
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: state.body,
-          text: `${toCurrency(poolAmount)} on the line.`,
-          url: shareUrl
-        });
-        return;
-      }
-
-      await navigator.clipboard.writeText(text);
-      window.alert("Claim link copied");
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        return;
-      }
-
-      window.alert("Unable to share this claim right now");
-    }
-  }
+  const selectedMultiplier =
+    selectedSide === "LIKE" ? yesReturn : selectedSide === "DISLIKE" ? noReturn : 1;
+  const selectedLabel = selectedSide === "LIKE" ? "YES" : "NO";
 
   return (
-    <article
-      id={`claim-${state.id}`}
-      className="rounded-[24px] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm transition hover:shadow-editorial"
-    >
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <FigureAvatar name={primaryFigure.name} imageUrl={primaryFigure.imageUrl} />
-          <div>
-            <Link href={`/figures/${primaryFigure.slug}`} className="font-headline text-lg font-bold text-on-surface">
-              {primaryFigure.name}
-            </Link>
-            <p className="text-xs font-medium uppercase tracking-wider text-on-secondary-container">
-              {primaryFigure.role} • {primaryFigure.country}
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <span className="rounded-full bg-secondary-fixed px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-on-secondary-fixed">
-            {heatLabel}
-          </span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-on-secondary-container">
-            {formatRelativeTime(state.createdAt)}
-          </span>
-        </div>
-      </div>
-
-      <div className="mb-6 space-y-4">
-        <p className="font-headline text-3xl font-black leading-tight tracking-tight text-primary">{state.body}</p>
-
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-2xl bg-editorial-gradient p-4 text-white">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/65">Current pool</p>
-            <p className="mt-2 font-headline text-3xl font-black">{toCurrency(poolAmount)}</p>
-            <p className="mt-2 text-xs text-white/75">{state.totalReactions} stakes placed</p>
-          </div>
-          <div className="rounded-2xl bg-surface-container p-4">
-            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.18em] text-on-secondary-container">
-              <span>Agree</span>
-              <span>Disagree</span>
+    <>
+      <article className="overflow-hidden rounded-[28px] border border-outline-variant/10 bg-surface-container-lowest shadow-sm">
+        <div className="space-y-6 p-6 md:p-7">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary">Live now</p>
+              <Link href={`/claims/${state.id}`} className="mt-3 block">
+                <h2 className="font-headline text-3xl font-black leading-tight tracking-tight text-on-surface md:text-4xl">
+                  {state.body}
+                </h2>
+              </Link>
             </div>
-            <div className="mt-3 flex items-center justify-between font-headline text-2xl font-black text-primary">
-              <span>{voteSplit.agree}%</span>
-              <span>{voteSplit.disagree}%</span>
-            </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-container-highest">
-              <div className="h-full bg-primary" style={{ width: `${voteSplit.agree}%` }} />
+            <div className="rounded-full bg-primary px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-white">
+              {countdown.label}
             </div>
           </div>
-          <div className="rounded-2xl bg-surface-container p-4">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-secondary-container">Countdown</p>
-            <p className="mt-2 font-headline text-3xl font-black text-primary">{countdown.label}</p>
-            <p className="mt-2 text-xs text-on-surface-variant">
-              {countdown.ended ? "Momentum is peaking now." : "Back a side before this round cools off."}
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center justify-between rounded-xl bg-surface-container p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-surface-container-highest text-xs font-black text-primary">
-              {state.sourceDomain.slice(0, 1).toUpperCase()}
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-3xl bg-editorial-gradient p-5 text-white">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/70">Pool</p>
+              <p className="mt-3 font-headline text-4xl font-black">{toCurrency(pools.totalPool)}</p>
             </div>
-            <div>
-              <p className="text-sm font-bold text-on-surface">{state.sourceTitle || state.sourceDomain}</p>
-              <p className="text-xs text-on-secondary-container">{state.sourceDomain}</p>
-            </div>
-          </div>
-          <a href={state.sourceUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-primary hover:underline">
-            View Source
-          </a>
-        </div>
-      </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-surface-container-high pt-5">
-        <div className="grid flex-1 gap-2 md:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => void react("LIKE")}
-            disabled={pending !== null}
-            className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50"
-          >
-            <MaterialIcon name="thumb_up" className="text-lg" />
-            <span>{pending === "LIKE" ? "Staking..." : `Agree + stake · ${state.likesCount}`}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => void react("DISLIKE")}
-            disabled={pending !== null}
-            className="flex items-center justify-center gap-2 rounded-xl bg-surface-container-high px-4 py-3 text-sm font-bold text-on-surface transition hover:bg-error-container disabled:opacity-50"
-          >
-            <MaterialIcon name="thumb_down" className="text-lg" />
-            <span>{pending === "DISLIKE" ? "Staking..." : `Disagree + stake · ${state.dislikesCount}`}</span>
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setCommentOpen((current) => !current)}
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-container text-on-secondary-container"
-          >
-            <MaterialIcon name="chat_bubble" className="text-lg" />
-          </button>
-          <button
-            type="button"
-            onClick={() => void shareClaim()}
-            className="flex items-center gap-2 rounded-xl bg-surface-container px-4 py-2 text-sm font-bold text-primary"
-          >
-            <MaterialIcon name="share" className="text-base" />
-            <span>Share claim</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-6 flex items-center justify-between border-t border-surface-container-high pt-4 text-[10px] font-medium opacity-70">
-        <div className="flex items-center gap-2">
-          <MaterialIcon name="account_balance_wallet" className="text-xs" />
-          <span>{state.postedByWallet}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <MaterialIcon name="schedule" className="text-xs" />
-          <span>{formatRelativeTime(state.createdAt)}</span>
-        </div>
-      </div>
-      <p className="mt-3 text-[11px] text-on-secondary-container">
-        Each stake adds {REACTION_PRICE_CUSD.toFixed(2)} cUSD to the action. Creators earn when the crowd piles in.
-      </p>
-      {commentOpen ? (
-        <div className="mt-5 space-y-4 rounded-xl border border-outline-variant/10 bg-surface-container p-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-headline text-lg font-bold text-primary">Paid takes</h3>
-            <span className="text-[11px] text-on-secondary-container">
-              Replying costs {COMMENT_PRICE_CUSD.toFixed(3)} cUSD
-            </span>
-          </div>
-          <div className="space-y-3">
-            {comments.map((comment) => (
-              <div key={comment.id} className="rounded-lg bg-surface-container-lowest p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-bold text-primary">{comment.postedByWallet}</span>
-                  <span className="text-[11px] text-on-secondary-container">{formatRelativeTime(comment.createdAt)}</span>
-                </div>
-                <p className="mt-2 text-sm text-on-surface">{comment.body}</p>
+            <div className="rounded-3xl bg-surface-container p-5">
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] text-on-secondary-container">
+                <span>Yes</span>
+                <span>No</span>
               </div>
-            ))}
-            {comments.length === 0 ? <p className="text-sm text-on-secondary-container">No comments yet.</p> : null}
+              <div className="mt-3 flex items-end justify-between gap-4">
+                <div>
+                  <div className="font-headline text-3xl font-black text-primary">{split.agree}%</div>
+                  <div className="text-xs font-semibold text-on-secondary-container">{toCurrency(pools.yesPool)}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-headline text-3xl font-black text-on-surface">{split.disagree}%</div>
+                  <div className="text-xs font-semibold text-on-secondary-container">{toCurrency(pools.noPool)}</div>
+                </div>
+              </div>
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-container-highest">
+                <div className="h-full bg-primary" style={{ width: `${split.agree}%` }} />
+              </div>
+            </div>
+
+            <div className="rounded-3xl bg-[#09103f] p-5 text-white">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/65">Time left</p>
+              <p className="mt-3 font-headline text-4xl font-black">{countdown.label}</p>
+            </div>
           </div>
-          <div className="space-y-3">
-            <textarea
-              rows={3}
-              value={commentBody}
-              onChange={(event) => setCommentBody(event.target.value)}
-              placeholder="Add your take"
-              className="w-full rounded-xl border-0 bg-surface-container-lowest p-3 outline-none"
-            />
+
+          {successState ? (
+            <div className="rounded-3xl border border-emerald-300/60 bg-emerald-50 px-4 py-4 text-emerald-950">
+              <p className="text-sm font-black uppercase tracking-[0.18em]">You backed {successState.side === "LIKE" ? "YES" : "NO"}</p>
+              <p className="mt-1 text-sm font-semibold">
+                You are ahead of {successState.oppositePercent}% of users right now.
+              </p>
+            </div>
+          ) : null}
+
+          <div className="grid gap-3 md:grid-cols-2">
             <button
               type="button"
-              disabled={commentPending || commentBody.trim().length < 2}
-              onClick={() => void postComment()}
-              className="rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+              disabled={countdown.ended || pending}
+              onClick={() => {
+                setSelectedSide("LIKE");
+                setSuccessState(null);
+              }}
+              className="rounded-3xl bg-primary px-5 py-5 text-left text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {commentPending ? "Posting..." : "Post paid take"}
+              <div className="text-[11px] font-black uppercase tracking-[0.2em] text-white/70">Back yes</div>
+              <div className="mt-2 font-headline text-3xl font-black">YES</div>
+              <div className="mt-1 text-sm font-semibold">possible {formatReturnMultiplier(yesReturn)}</div>
+            </button>
+            <button
+              type="button"
+              disabled={countdown.ended || pending}
+              onClick={() => {
+                setSelectedSide("DISLIKE");
+                setSuccessState(null);
+              }}
+              className="rounded-3xl bg-surface-container-high px-5 py-5 text-left text-on-surface transition hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <div className="text-[11px] font-black uppercase tracking-[0.2em] text-on-secondary-container">Back no</div>
+              <div className="mt-2 font-headline text-3xl font-black">NO</div>
+              <div className="mt-1 text-sm font-semibold">possible {formatReturnMultiplier(noReturn)}</div>
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/10 pt-4 text-sm text-on-secondary-container">
+            <div className="flex items-center gap-2">
+              <MaterialIcon name="trending_up" className="text-base" />
+              <span className="font-semibold">{primaryFigure.name}</span>
+            </div>
+            {detail ? (
+              <a href={state.sourceUrl} target="_blank" rel="noreferrer" className="font-bold text-primary hover:underline">
+                View source
+              </a>
+            ) : (
+              <Link href={`/claims/${state.id}`} className="font-bold text-primary hover:underline">
+                View market
+              </Link>
+            )}
+          </div>
+
+          {detail ? (
+            <div className="rounded-3xl bg-emerald-50 px-4 py-4 text-emerald-950">
+              <p className="text-[11px] font-black uppercase tracking-[0.2em]">Creator earned</p>
+              <p className="mt-1 font-headline text-3xl font-black">{toCurrency(state.earnedCusd)}</p>
+            </div>
+          ) : null}
+        </div>
+      </article>
+
+      {selectedSide ? (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/45 p-4 md:items-center">
+          <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">Back {selectedLabel}</p>
+                <h3 className="mt-2 font-headline text-2xl font-black text-on-surface">{state.body}</h3>
+              </div>
+              <button type="button" onClick={() => setSelectedSide(null)} className="rounded-full bg-surface-container p-2 text-on-surface">
+                <MaterialIcon name="close" className="text-lg" />
+              </button>
+            </div>
+
+            <div className="mt-6 space-y-4 rounded-3xl bg-surface-container-low p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-on-secondary-container">Pool</span>
+                <span className="font-headline text-2xl font-black text-primary">{toCurrency(pools.totalPool)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-on-secondary-container">Your return if {selectedLabel} wins</span>
+                <span className="font-headline text-2xl font-black text-on-surface">
+                  {formatReturnMultiplier(selectedMultiplier)}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                className="rounded-2xl bg-primary px-4 py-3 font-black text-white"
+              >
+                {REACTION_PRICE_CUSD.toFixed(2)}
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void confirmStake()}
+              disabled={pending}
+              className="mt-6 flex w-full items-center justify-center rounded-3xl bg-primary px-5 py-4 font-headline text-lg font-black text-white disabled:opacity-60"
+            >
+              {pending ? "Confirming..." : "Confirm"}
             </button>
           </div>
         </div>
       ) : null}
-    </article>
+    </>
   );
 }

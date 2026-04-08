@@ -148,6 +148,21 @@ export async function getFigureWall(slug: string) {
   };
 }
 
+export async function getClaimById(claimId: string) {
+  const claim = await prisma.claim.findUnique({
+    where: { id: claimId },
+    include: {
+      figures: {
+        include: {
+          figure: true
+        }
+      }
+    }
+  });
+
+  return claim ? serializeClaim(claim) : null;
+}
+
 export async function getNotifications(walletAddress?: string) {
   const user =
     walletAddress &&
@@ -187,6 +202,9 @@ export async function getProfile(walletAddress?: string) {
       displayName: "Claimd Creator",
       selectedCountry: "Global",
       totalPosts: 0,
+      totalStaked: 0,
+      winsCount: 0,
+      lossesCount: 0,
       totalReactionsReceived: 0,
       totalEarned: 0,
       availableOnchainRewards,
@@ -212,6 +230,13 @@ export async function getProfile(walletAddress?: string) {
     orderBy: { createdAt: "desc" },
     take: 8
   });
+  const reactions = await prisma.reaction.findMany({
+    where: { userId: user.id },
+    include: {
+      claim: true
+    },
+    orderBy: { createdAt: "desc" }
+  });
 
   const followedFigureRecords = await prisma.userFigureFollow.findMany({
     where: { userId: user.id },
@@ -226,6 +251,24 @@ export async function getProfile(walletAddress?: string) {
       : await getTrendingFigures(user.selectedCountry, 4);
   const totalReactionsReceived = claims.reduce((sum, claim) => sum + claim.totalReactions, 0);
   const totalEarned = claims.reduce((sum, claim) => sum + claim.earnedCusd, 0);
+  const totalStaked = reactions.reduce((sum, reaction) => sum + reaction.amountCusd, 0);
+  const { winsCount, lossesCount } = reactions.reduce(
+    (totals, reaction) => {
+      if (reaction.claim.likesCount === reaction.claim.dislikesCount) {
+        return totals;
+      }
+
+      const leadingType = reaction.claim.likesCount > reaction.claim.dislikesCount ? "LIKE" : "DISLIKE";
+      if (reaction.type === leadingType) {
+        totals.winsCount += 1;
+      } else {
+        totals.lossesCount += 1;
+      }
+
+      return totals;
+    },
+    { winsCount: 0, lossesCount: 0 }
+  );
   const availableOnchainRewards = await getCreatorAccruedOnchain(user.walletAddress).catch(() => 0);
 
   return serializeProfile({
@@ -233,6 +276,9 @@ export async function getProfile(walletAddress?: string) {
     displayName: user.displayName,
     selectedCountry: user.selectedCountry,
     totalPosts: claims.length,
+    totalStaked,
+    winsCount,
+    lossesCount,
     totalReactionsReceived,
     totalEarned,
     availableOnchainRewards,

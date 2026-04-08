@@ -131,6 +131,9 @@ export function serializeProfile(input: {
   displayName: string | null;
   selectedCountry: string;
   totalPosts: number;
+  totalStaked: number;
+  winsCount: number;
+  lossesCount: number;
   totalReactionsReceived: number;
   totalEarned: number;
   availableOnchainRewards: number;
@@ -143,6 +146,9 @@ export function serializeProfile(input: {
     displayName: input.displayName || "Claimd Creator",
     selectedCountry: input.selectedCountry,
     totalPosts: input.totalPosts,
+    totalStaked: input.totalStaked,
+    winsCount: input.winsCount,
+    lossesCount: input.lossesCount,
     totalReactionsReceived: input.totalReactionsReceived,
     totalEarned: input.totalEarned,
     availableOnchainRewards: input.availableOnchainRewards,

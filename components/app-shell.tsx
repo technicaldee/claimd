@@ -18,7 +18,7 @@ export function AppShell({
       {showFloatingPostAction ? (
         <Link
           href="/post"
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-1/2 z-50 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-primary px-5 py-3 font-headline text-sm font-extrabold uppercase tracking-[0.14em] text-white shadow-editorial transition hover:opacity-95 md:bottom-6 md:left-auto md:right-6 md:translate-x-0"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-4 z-50 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 font-headline text-sm font-extrabold uppercase tracking-[0.14em] text-white shadow-editorial transition hover:opacity-95 md:bottom-6 md:right-6"
         >
           <MaterialIcon name="add" filled className="text-lg" />
           <span>Start bet</span>

@@ -9,13 +9,10 @@ import { fetcher } from "@/lib/fetcher";
 import { CLAIM_PRICE_CUSD } from "@/lib/payments/celo";
 import type { ClaimValidationResult, FigureSummary } from "@/lib/types";
 
-const defaultCategories = ["Politics", "Governance", "Music", "Entertainment", "Business", "Football", "Technology"];
-
 export default function PostPage() {
   const router = useRouter();
   const { country } = useCountry();
   const { walletAddress, connect, sendClaimPayment } = useWallet();
-  const [category, setCategory] = useState("Politics");
   const [claimText, setClaimText] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [query, setQuery] = useState("");
@@ -27,14 +24,8 @@ export default function PostPage() {
     fetcher
   );
 
-  const canPost = validation?.ok && claimText.length > 20 && selectedFigures.length > 0 && sourceUrl;
-  const previewTitle = useMemo(() => {
-    if (claimText.trim()) {
-      return claimText.trim();
-    }
-
-    return "Your sourced claim preview will appear here.";
-  }, [claimText]);
+  const canPost = validation?.ok && claimText.trim().length > 20 && selectedFigures.length > 0 && sourceUrl;
+  const previewTitle = useMemo(() => claimText.trim() || "Your claim goes here.", [claimText]);
 
   async function validateSource() {
     const response = await fetch("/api/claims/validate", {
@@ -71,7 +62,7 @@ export default function PostPage() {
         body: JSON.stringify({
           claimText,
           sourceUrl,
-          category,
+          category: "Hot Takes",
           country,
           walletAddress: walletAddress || "0xLocalPreview00000000000000000000000000000001",
           figures: selectedFigures,
@@ -84,8 +75,8 @@ export default function PostPage() {
         throw new Error(error.error || "Unable to publish claim");
       }
 
-      const payload = (await response.json()) as { primaryFigureSlug: string };
-      await router.push(`/figures/${payload.primaryFigureSlug}`);
+      const payload = (await response.json()) as { id: string };
+      await router.push(`/claims/${payload.id}`);
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Unable to post claim");
     } finally {
@@ -95,168 +86,122 @@ export default function PostPage() {
 
   return (
     <AppShell active="post">
-      <div className="mx-auto max-w-4xl">
-        <header className="mb-10">
-          <h1 className="font-headline text-5xl font-extrabold tracking-tight text-primary">Start a Bet</h1>
-          <div className="mt-5 flex items-start gap-3 rounded-xl border-l-4 border-primary bg-secondary-container p-4">
-            <MaterialIcon name="info" className="mt-0.5 text-primary" />
-            <p className="text-sm leading-relaxed text-on-secondary-container">
-              Start a debate people can instantly back with money. Keep it sharp, tag at least one public figure, and attach a source link if you have one.
-            </p>
+      <div className="mx-auto max-w-3xl space-y-8">
+        <section className="space-y-3">
+          <p className="text-sm font-black uppercase tracking-[0.22em] text-primary">Create a claim</p>
+          <h1 className="font-headline text-5xl font-black tracking-tight text-on-surface">Start a bet</h1>
+        </section>
+
+        <section className="space-y-6 rounded-[32px] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:p-8">
+          <div className="space-y-3">
+            <label className="text-[11px] font-black uppercase tracking-[0.2em] text-on-secondary-container">Public figure</label>
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search public figure"
+              className="w-full rounded-2xl border-0 bg-surface-container px-4 py-4 text-on-surface outline-none"
+            />
+            {selectedFigures.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {selectedFigures.map((figure) => (
+                  <button
+                    key={figure.id}
+                    type="button"
+                    onClick={() => setSelectedFigures((current) => current.filter((item) => item.id !== figure.id))}
+                    className="rounded-full bg-primary px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-white"
+                  >
+                    {figure.name} ×
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <div className="grid gap-3 md:grid-cols-2">
+              {searchResults.slice(0, 6).map((figure) => {
+                const selected = selectedFigures.some((item) => item.id === figure.id);
+                return (
+                  <button
+                    key={`${figure.source}-${figure.id}`}
+                    type="button"
+                    onClick={() => {
+                      if (selected) {
+                        setSelectedFigures((current) => current.filter((item) => item.id !== figure.id));
+                      } else {
+                        setSelectedFigures((current) => [figure]);
+                      }
+                    }}
+                    className={`rounded-3xl border px-4 py-4 text-left transition ${
+                      selected ? "border-primary bg-primary text-white" : "border-outline-variant/15 bg-surface-container hover:border-primary/30"
+                    }`}
+                  >
+                    <div className="font-headline text-xl font-black">{figure.name}</div>
+                    <div className={`mt-1 text-xs font-semibold uppercase tracking-[0.16em] ${selected ? "text-white/75" : "text-on-secondary-container"}`}>
+                      {figure.role}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </header>
 
-        <div className="rounded-[28px] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:p-10">
-          <div className="space-y-8">
-            <div className="space-y-3">
-              <label className="font-headline text-lg font-bold text-primary">Who is this about?</label>
+          <div className="space-y-3">
+            <label className="text-[11px] font-black uppercase tracking-[0.2em] text-on-secondary-container">Claim</label>
+            <textarea
+              rows={4}
+              value={claimText}
+              onChange={(event) => setClaimText(event.target.value)}
+              placeholder="Wizkid is bigger than Davido"
+              className="w-full rounded-3xl border-0 bg-surface-container p-4 font-headline text-2xl font-black text-on-surface outline-none"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-[11px] font-black uppercase tracking-[0.2em] text-on-secondary-container">Source</label>
+            <div className="flex flex-col gap-3 md:flex-row">
               <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search a public figure (e.g. Burna Boy)"
-                className="w-full rounded-xl border-0 bg-surface-container-highest px-4 py-4 outline-none ring-0"
+                value={sourceUrl}
+                onChange={(event) => setSourceUrl(event.target.value)}
+                placeholder="https://..."
+                className="min-w-0 flex-1 rounded-2xl border-0 bg-surface-container px-4 py-4 outline-none"
               />
-              {selectedFigures.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {selectedFigures.map((figure) => (
-                    <button
-                      key={figure.id}
-                      type="button"
-                      onClick={() => setSelectedFigures((current) => current.filter((item) => item.id !== figure.id))}
-                      className="rounded-full bg-secondary-fixed px-3 py-1 text-xs font-bold text-on-secondary-fixed"
-                    >
-                      {figure.name} ×
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-              <div className="grid gap-3 md:grid-cols-2">
-                {searchResults.slice(0, 6).map((figure) => {
-                  const selected = selectedFigures.some((item) => item.id === figure.id);
-                  return (
-                    <button
-                      key={`${figure.source}-${figure.id}`}
-                      type="button"
-                      onClick={() => {
-                        if (selected) {
-                          setSelectedFigures((current) => current.filter((item) => item.id !== figure.id));
-                        } else {
-                          setSelectedFigures((current) => [...current, figure]);
-                        }
-                      }}
-                      className={`rounded-xl border p-4 text-left transition ${selected ? "border-primary bg-primary text-white" : "border-outline-variant/15 bg-surface-container hover:border-primary/30"}`}
-                    >
-                      <div className="font-headline text-lg font-bold">{figure.name}</div>
-                      <div className={`text-xs uppercase tracking-wider ${selected ? "text-white/75" : "text-on-secondary-container"}`}>
-                        {figure.role} • {figure.country}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="space-y-3">
-                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-outline">Category</label>
-                <select
-                  value={category}
-                  onChange={(event) => setCategory(event.target.value)}
-                  className="w-full rounded-xl border-0 bg-surface-container-highest px-4 py-4 outline-none"
-                >
-                  {defaultCategories.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-3">
-                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-outline">Country context</label>
-                <div className="flex items-center gap-3 rounded-xl bg-surface-container px-4 py-4 text-on-surface">
-                  <MaterialIcon name="language" className="text-outline" />
-                  <span>{country}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <label className="font-headline text-lg font-bold text-primary">What are people betting on?</label>
-              <textarea
-                rows={4}
-                value={claimText}
-                onChange={(event) => setClaimText(event.target.value)}
-                placeholder="Write the take people will argue over."
-                className="w-full rounded-xl border-0 bg-surface-container-highest p-4 outline-none"
-              />
-              <div className="text-right text-[10px] font-bold uppercase tracking-[0.2em] text-outline">{claimText.length} / 280</div>
-            </div>
-
-            <div className="space-y-3">
-              <label className="font-headline text-lg font-bold text-primary">Source link</label>
-              <div className="flex flex-col gap-4 md:flex-row">
-                <input
-                  value={sourceUrl}
-                  onChange={(event) => setSourceUrl(event.target.value)}
-                  placeholder="https://news.source.com/article"
-                  className="min-w-0 flex-1 rounded-xl border-0 bg-surface-container-highest px-4 py-4 outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => void validateSource()}
-                  className="rounded-xl bg-editorial-gradient px-8 py-4 font-semibold text-white transition hover:opacity-90"
-                >
-                  Check source
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-xl bg-surface-container-low p-4">
-              <div className={`h-2 w-2 rounded-full ${validation?.ok ? "bg-emerald-500" : validation ? "bg-error" : "bg-outline"}`} />
-              <span className="text-sm text-on-surface-variant">
-                {validation?.ok
-                  ? `Validation passed${validation.title ? `: ${validation.title}` : ""}`
-                  : validation?.reason || "Validation pending. Add a URL and verify it before starting this bet."}
-              </span>
-            </div>
-
-            <div className="border-t border-outline-variant/10 pt-8">
-              <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-outline">Live card preview</p>
-              <div className="rounded-xl bg-surface-container p-6">
-                <div className="mb-4 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-highest font-headline font-bold text-primary">
-                    {selectedFigures[0]?.name.slice(0, 2) || "PF"}
-                  </div>
-                  <div>
-                    <div className="font-headline font-bold text-primary">{selectedFigures.map((figure) => figure.name).join(", ") || "Selected figures"}</div>
-                    <div className="text-xs text-on-secondary-container">{category} • {country}</div>
-                  </div>
-                </div>
-                <p className="font-headline text-xl font-bold text-on-surface">{previewTitle}</p>
-                <div className="mt-4 flex flex-wrap gap-3 text-xs font-semibold text-on-secondary-container">
-                  <span>Pool starts at 0.00 cUSD</span>
-                  <span>24h countdown</span>
-                  <span>Agree vs disagree</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4">
-              <p className="mb-3 text-center text-xs text-on-secondary-container">
-                Starting this bet costs {CLAIM_PRICE_CUSD.toFixed(2)} cUSD on Celo.
-              </p>
               <button
                 type="button"
-                disabled={!canPost || saving}
-                onClick={() => void publishClaim()}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-5 font-headline text-lg font-extrabold text-white disabled:cursor-not-allowed disabled:bg-surface-container-highest disabled:text-outline"
+                onClick={() => void validateSource()}
+                className="rounded-2xl bg-surface-container-high px-6 py-4 font-black text-on-surface"
               >
-                {saving ? "Starting..." : "Start this bet"}
-                <MaterialIcon name={canPost ? "send" : "lock"} />
+                Check
               </button>
             </div>
           </div>
-        </div>
+
+          <div className={`rounded-3xl px-4 py-4 ${validation?.ok ? "bg-emerald-50 text-emerald-950" : "bg-surface-container text-on-secondary-container"}`}>
+            <div className="flex items-center gap-3">
+              <div className={`h-2.5 w-2.5 rounded-full ${validation?.ok ? "bg-emerald-500" : validation ? "bg-error" : "bg-outline"}`} />
+              <span className="text-sm font-semibold">
+                {validation?.ok ? "Source verified." : validation?.reason || "Add a source and verify before creating."}
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-[28px] bg-[#09103f] p-6 text-white">
+            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/70">Preview</p>
+            <p className="mt-3 font-headline text-3xl font-black">{previewTitle}</p>
+            <div className="mt-4 flex items-center gap-3 text-sm font-semibold text-white/75">
+              <span>{selectedFigures[0]?.name || "Pick a figure"}</span>
+              <span>•</span>
+              <span>Cost: {CLAIM_PRICE_CUSD.toFixed(2)} cUSD</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={!canPost || saving}
+            onClick={() => void publishClaim()}
+            className="flex w-full items-center justify-center gap-2 rounded-3xl bg-primary px-5 py-5 font-headline text-lg font-black text-white disabled:cursor-not-allowed disabled:bg-surface-container-highest disabled:text-outline"
+          >
+            {saving ? "Creating..." : "Create"}
+            <MaterialIcon name={canPost ? "arrow_forward" : "lock"} />
+          </button>
+        </section>
       </div>
     </AppShell>
   );
