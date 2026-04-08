@@ -1,20 +1,9 @@
 import type { AppProps } from "next/app";
 import Head from "next/head";
 import Script from "next/script";
-import { Inter, Manrope } from "next/font/google";
 import { CountryProvider } from "@/components/country-provider";
 import { WalletProvider } from "@/components/wallet-provider";
 import "@/styles/globals.css";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter"
-});
-
-const manrope = Manrope({
-  subsets: ["latin"],
-  variable: "--font-manrope"
-});
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
@@ -46,7 +35,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:image" content="/logo.png" />
       </Head>
-      <div className={`${inter.variable} ${manrope.variable}`}>
+      <div>
         <CountryProvider>
           <WalletProvider>
             <Component {...pageProps} />

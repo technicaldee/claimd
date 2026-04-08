@@ -61,9 +61,9 @@ const config: Config = {
         xl: "0.75rem"
       },
       fontFamily: {
-        headline: ["var(--font-manrope)", "sans-serif"],
-        body: ["var(--font-inter)", "sans-serif"],
-        label: ["var(--font-inter)", "sans-serif"]
+        headline: ["Avenir Next", "Manrope", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        body: ["Inter", "Avenir Next", "ui-sans-serif", "system-ui", "sans-serif"],
+        label: ["Inter", "Avenir Next", "ui-sans-serif", "system-ui", "sans-serif"]
       },
       boxShadow: {
         editorial: "0 24px 60px -32px rgba(0, 11, 96, 0.35)"

@@ -52,7 +52,7 @@ export function TopBar({ active }: { active: "home" | "explore" | "post" | "noti
               aria-label="Profile"
               className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container text-primary transition hover:bg-surface-container-high"
             >
-              <MaterialIcon name="person" filled={active === "profile"} className="text-xl" />
+              <MaterialIcon name="person" className="text-xl" />
             </Link>
           ) : null}
         </div>
