@@ -22,6 +22,7 @@ import {
 } from "@/lib/payments/celo";
 
 type InjectedProvider = NonNullable<Window["ethereum"]>;
+type RpcProvider = Pick<InjectedProvider, "request">;
 
 type TransactionRequest = {
   from: Address;
@@ -56,6 +57,10 @@ export async function requestMiniPayAccount(provider: InjectedProvider) {
 }
 
 export async function ensureMiniPayChain(provider: InjectedProvider) {
+  return ensureCeloChain(provider);
+}
+
+export async function ensureCeloChain(provider: RpcProvider) {
   const currentChainId = (await provider.request({ method: "eth_chainId" }).catch(() => undefined)) as
     | string
     | undefined;

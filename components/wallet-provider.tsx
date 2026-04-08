@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { BrowserProvider, Contract, parseUnits } from "ethers";
 import EthereumProvider from "@walletconnect/ethereum-provider";
 import {
+  CLAIM_PRICE_CUSD,
   CELO_CHAIN_ID,
   COMMENT_PRICE_CUSD,
   CUSD_ABI,
@@ -13,6 +14,7 @@ import {
   REACTIONS_TREASURY_ADDRESS
 } from "@/lib/payments/celo";
 import {
+  ensureCeloChain,
   ensureMiniPayChain,
   isMiniPayProvider,
   miniPayApproveStableToken,
@@ -32,6 +34,7 @@ interface WalletContextValue {
   isMiniPay: boolean;
   connecting: boolean;
   connect: () => Promise<void>;
+  sendClaimPayment: () => Promise<string | undefined>;
   sendReactionPayment: (claimId?: string, isLike?: boolean) => Promise<string | undefined>;
   withdrawCreatorRewards: () => Promise<string | undefined>;
   sendCommentPayment: (creatorWallet: string) => Promise<string | undefined>;
@@ -122,6 +125,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
     if (isMiniPayProvider(window.ethereum)) {
       await ensureMiniPayChain(window.ethereum).catch(() => undefined);
+    } else {
+      await ensureCeloChain(window.ethereum).catch(() => undefined);
     }
 
     const accounts = (await window.ethereum.request({ method: "eth_requestAccounts" })) as string[];
@@ -153,6 +158,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     });
 
     await provider.enable();
+    await ensureCeloChain(provider).catch(() => undefined);
     walletConnectRef.current = provider;
     const account = provider.accounts[0];
 
@@ -205,7 +211,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       throw new Error("No wallet provider available");
     }
 
-    if (isMiniPayProvider(window.ethereum) && window.ethereum) {
+    await ensureCeloChain(providerSource).catch(() => undefined);
+    const usingMiniPay = providerSource === window.ethereum && isMiniPayProvider(window.ethereum);
+
+    if (usingMiniPay && window.ethereum) {
       const amount = parseUnits(String(REACTION_PRICE_CUSD), 18);
       if (claimId) {
         const readProvider = new BrowserProvider(window.ethereum);
@@ -244,6 +253,38 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     return tx.hash as string;
   }, [ensureWalletAddress]);
 
+  const sendClaimPayment = useCallback(async () => {
+    const activeWallet = await ensureWalletAddress();
+
+    if (!activeWallet) {
+      throw new Error("Connect a wallet to continue");
+    }
+
+    if (!PLATFORM_WALLET_ADDRESS) {
+      throw new Error("Missing platform wallet address");
+    }
+
+    const providerSource = walletConnectRef.current ?? window.ethereum;
+    if (!providerSource) {
+      throw new Error("No wallet provider available");
+    }
+
+    await ensureCeloChain(providerSource).catch(() => undefined);
+    const usingMiniPay = providerSource === window.ethereum && isMiniPayProvider(window.ethereum);
+    const amount = parseUnits(String(CLAIM_PRICE_CUSD), 18);
+
+    if (usingMiniPay && window.ethereum) {
+      return miniPayTransferStableToken(window.ethereum, activeWallet, PLATFORM_WALLET_ADDRESS, amount);
+    }
+
+    const provider = new BrowserProvider(providerSource);
+    const signer = await provider.getSigner();
+    const cusd = new Contract(CUSD_TOKEN_ADDRESS, CUSD_ABI, signer);
+    const tx = await cusd.transfer(PLATFORM_WALLET_ADDRESS, amount);
+    await tx.wait();
+    return tx.hash as string;
+  }, [ensureWalletAddress]);
+
   const sendCommentPayment = useCallback(async (creatorWallet: string) => {
     const activeWallet = await ensureWalletAddress();
 
@@ -256,7 +297,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       throw new Error("No wallet provider available");
     }
 
-    if (isMiniPayProvider(window.ethereum) && window.ethereum) {
+    await ensureCeloChain(providerSource).catch(() => undefined);
+    const usingMiniPay = providerSource === window.ethereum && isMiniPayProvider(window.ethereum);
+
+    if (usingMiniPay && window.ethereum) {
       const creatorAmount = parseUnits(String((COMMENT_PRICE_CUSD * 0.7).toFixed(4)), 18);
       const platformAmount = parseUnits(String((COMMENT_PRICE_CUSD * 0.3).toFixed(4)), 18);
 
@@ -320,6 +364,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       isMiniPay,
       connecting,
       connect,
+      sendClaimPayment,
       sendReactionPayment,
       withdrawCreatorRewards,
       sendCommentPayment
@@ -330,6 +375,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       isMiniPay,
       connecting,
       connect,
+      sendClaimPayment,
       sendReactionPayment,
       withdrawCreatorRewards,
       sendCommentPayment

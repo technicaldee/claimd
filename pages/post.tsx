@@ -6,6 +6,7 @@ import { MaterialIcon } from "@/components/material-icon";
 import { useCountry } from "@/components/country-provider";
 import { useWallet } from "@/components/wallet-provider";
 import { fetcher } from "@/lib/fetcher";
+import { CLAIM_PRICE_CUSD } from "@/lib/payments/celo";
 import type { ClaimValidationResult, FigureSummary } from "@/lib/types";
 
 const defaultCategories = ["Politics", "Governance", "Music", "Entertainment", "Business", "Football", "Technology"];
@@ -13,7 +14,7 @@ const defaultCategories = ["Politics", "Governance", "Music", "Entertainment", "
 export default function PostPage() {
   const router = useRouter();
   const { country } = useCountry();
-  const { walletAddress, connect } = useWallet();
+  const { walletAddress, connect, sendClaimPayment } = useWallet();
   const [category, setCategory] = useState("Politics");
   const [claimText, setClaimText] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
@@ -60,6 +61,8 @@ export default function PostPage() {
     setSaving(true);
 
     try {
+      await sendClaimPayment();
+
       const response = await fetch("/api/claims", {
         method: "POST",
         headers: {
@@ -239,6 +242,9 @@ export default function PostPage() {
             </div>
 
             <div className="pt-4">
+              <p className="mb-3 text-center text-xs text-on-secondary-container">
+                Starting this bet costs {CLAIM_PRICE_CUSD.toFixed(2)} cUSD on Celo.
+              </p>
               <button
                 type="button"
                 disabled={!canPost || saving}
