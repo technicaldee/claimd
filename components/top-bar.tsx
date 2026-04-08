@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { compactWallet, cn } from "@/lib/utils";
+import { compactWallet } from "@/lib/utils";
 import { MaterialIcon } from "@/components/material-icon";
 import { useWallet } from "@/components/wallet-provider";
 
@@ -13,18 +13,13 @@ export function TopBar({ active }: { active: "home" | "explore" | "post" | "noti
       : isMiniPay
         ? "Continue in MiniPay"
         : "Connect wallet";
-
-  const links = [
-    { href: "/", label: "Home", key: "home" },
-    { href: "/explore", label: "Explore", key: "explore" },
-    { href: "/profile", label: "Profile", key: "profile" }
-  ] as const;
   const walletChip = (
     <div className="flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-white">
       <MaterialIcon name={isMiniPay ? "account_balance_wallet" : "wallet"} filled className="text-base" />
       <span>{walletLabel}</span>
     </div>
   );
+  const showProfileLink = active !== "onboarding" && active !== "profile";
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur" style={{ paddingTop: "env(safe-area-inset-top)" }}>
@@ -38,21 +33,7 @@ export function TopBar({ active }: { active: "home" | "explore" | "post" | "noti
           </Link>
         </div>
 
-        <div className="flex items-center gap-4">
-          <nav className="hidden items-center gap-6 md:flex">
-            {links.map((link) => (
-              <Link
-                key={link.key}
-                href={link.href}
-                className={cn(
-                  "rounded-xl px-3 py-1 font-headline text-lg font-bold tracking-tight transition-colors",
-                  active === link.key ? "text-primary" : "text-on-surface-variant hover:bg-surface-container"
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
+        <div className="flex items-center gap-2 md:gap-3">
           {isMiniPay ? (
             walletChip
           ) : (
@@ -65,6 +46,15 @@ export function TopBar({ active }: { active: "home" | "explore" | "post" | "noti
               <span>{walletLabel}</span>
             </button>
           )}
+          {showProfileLink ? (
+            <Link
+              href="/profile"
+              aria-label="Profile"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container text-primary transition hover:bg-surface-container-high"
+            >
+              <MaterialIcon name="person" filled={active === "profile"} className="text-xl" />
+            </Link>
+          ) : null}
         </div>
       </div>
       <div className="h-px bg-surface-container-high" />
